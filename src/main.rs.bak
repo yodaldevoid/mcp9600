@@ -1,0 +1,37 @@
+use anyhow;
+use embedded_hal::blocking::delay::DelayMs;
+use esp_idf_hal::{
+    delay::FreeRtos,
+    i2c::{config::MasterConfig, Master, MasterPins, I2C0},
+    peripherals::Peripherals,
+    prelude::*,
+};
+use esp_idf_sys::*;
+
+use mcp9600::{DeviceAddr, MCP9600};
+
+fn main() -> anyhow::Result<()> {
+    link_patches();
+
+    let peripherals = Peripherals::take().unwrap();
+
+    let sda = peripherals.pins.gpio10;
+    let scl = peripherals.pins.gpio8;
+
+    let i2c = Master::<I2C0, _, _>::new(
+        peripherals.i2c0,
+        MasterPins { sda, scl },
+        <MasterConfig as Default>::default().baudrate(400.kHz().into()),
+    )?;
+
+    let mut sensor = MCP9600::new(i2c, DeviceAddr::AD0)?;
+
+    println!("Sensor init");
+
+    let device_id = sensor.read_device_id_register()?;
+
+    println!("Hello, world, I am sensor {}", device_id);
+    loop {
+        FreeRtos.delay_ms(500u32);
+    }
+}
