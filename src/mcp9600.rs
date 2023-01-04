@@ -85,6 +85,21 @@ where
         }
     }
 
+    pub fn set_sensor_configuration(
+        &mut self,
+        thermocoupletype: ThermocoupleType,
+        filtercoefficient: FilterCoefficient,
+    ) -> Result<(), E> {
+        let configuration: u8 = thermocoupletype as u8 & filtercoefficient as u8;
+        // for TypeK and Medium filter, this should produce the following LSB0 byte:
+        // 0  0  0  0  0  1  0  0
+        // 7  6  5  4  3  2  1  0
+        // U  ThermoT  U  FilterT
+        self.i2c.write(
+            self.address as u8,
+            &[Register::HotJunction as u8, configuration],
+        )
+    }
     // TODO: Device Configuration Register
     // TODO: Read Delta Temperature Register
     // TODO: Read Cold Junction
@@ -116,26 +131,28 @@ pub enum Register {
 
 #[derive(Clone, Copy)]
 pub enum ThermocoupleType {
-    TypeK = 0b000,
-    TypeJ = 0b001,
-    TypeT = 0b010,
-    TypeN = 0b011,
-    TypeS = 0b100,
-    TypeE = 0b101,
-    TypeB = 0b110,
-    TypeR = 0b111,
+    // Rather than mess around with constructing a bit vector, lets just make this a logical
+    // operator
+    TypeK = 0b0000_0000,
+    TypeJ = 0b0001_0000,
+    TypeT = 0b0010_0000,
+    TypeN = 0b0011_0000,
+    TypeS = 0b0100_0000,
+    TypeE = 0b0101_0000,
+    TypeB = 0b0110_0000,
+    TypeR = 0b0111_0000,
 }
 
 #[derive(Clone, Copy)]
 pub enum FilterCoefficient {
-    FilterOff = 0b000,
-    FilterMinimum = 0b001,
-    Filter2 = 0b010,
-    Filter3 = 0b011,
-    FilterMedium = 0b100,
-    Filter5 = 0b101,
-    Filter6 = 0b110,
-    FilterMaximum = 0b111,
+    FilterOff = 0b0000_0000,
+    FilterMinimum = 0b0000_0001,
+    Filter2 = 0b0000_0010,
+    Filter3 = 0b0000_0011,
+    FilterMedium = 0b0000_0100,
+    Filter5 = 0b0000_0101,
+    Filter6 = 0b0000_0110,
+    FilterMaximum = 0b0000_0111,
 }
 
 pub enum ADCResolution {
