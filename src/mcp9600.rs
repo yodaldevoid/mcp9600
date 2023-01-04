@@ -84,6 +84,10 @@ where
             true => return Ok((buffer[0] as f32 * 16.0 + buffer[1] as f32 / 16.0) - 4096.0),
         }
     }
+
+    // TODO: Device Configuration Register
+    // TODO: Read Delta Temperature Register
+    // TODO: Read Cold Junction
 }
 
 #[derive(Clone, Copy)]
@@ -110,11 +114,57 @@ pub enum Register {
     DeviceID = 0b0010_0000, // Should contain the device ID
 }
 
+#[derive(Clone, Copy)]
+pub enum ThermocoupleType {
+    TypeK = 0b000,
+    TypeJ = 0b001,
+    TypeT = 0b010,
+    TypeN = 0b011,
+    TypeS = 0b100,
+    TypeE = 0b101,
+    TypeB = 0b110,
+    TypeR = 0b111,
+}
+
+#[derive(Clone, Copy)]
+pub enum FilterCoefficient {
+    FilterOff = 0b000,
+    FilterMinimum = 0b001,
+    Filter2 = 0b010,
+    Filter3 = 0b011,
+    FilterMedium = 0b100,
+    Filter5 = 0b101,
+    Filter6 = 0b110,
+    FilterMaximum = 0b111,
+}
+
+pub enum ADCResolution {
+    Bit18 = 0b00,
+    Bit16 = 0b01,
+    Bit14 = 0b10,
+    Bit12 = 0b11,
+}
+pub enum BurstModeSamples {
+    Sample1 = 0b000,
+    Sample2 = 0b001,
+    Sample4 = 0b010,
+    Sample8 = 0b011,
+    Sample16 = 0b100,
+    Sample32 = 0b101,
+    Sample64 = 0b110,
+    Sample128 = 0b111,
+}
+pub enum ShutdownMode {
+    NormalMode = 0b00,
+    ShutdownMode = 0b01,
+    BurstMode = 0b10,
+}
 impl Register {
     fn address(&self) -> u8 {
         *self as u8
     }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
