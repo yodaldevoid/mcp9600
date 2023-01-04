@@ -68,7 +68,7 @@ where
 
 #[derive(Clone, Copy)]
 pub enum Register {
-    DeviceID = 0x20, // Should contain the device ID. 0b00100000
+    DeviceID = 0b0010_0000, // Should contain the device ID. 0b00100000
 }
 
 impl Register {
