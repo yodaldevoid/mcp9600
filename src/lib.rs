@@ -1,5 +1,8 @@
 #![deny(unsafe_code)]
 #![no_std]
 
-pub mod encode;
-pub mod mcp9600;
+mod encode;
+mod types;
+
+use bitvec::prelude::*;
+use embedded_hal::blocking::i2c;
