@@ -74,9 +74,10 @@ where
             &[Register::HotJunction as u8],
             &mut data,
         )?;
+        Self::temperature_conversion(&data)
     }
 
-    fn temperature_conversion(buffer: &[u8]) -> Result<f32, E> {
+    pub fn temperature_conversion(buffer: &[u8]) -> Result<f32, E> {
         let (sign, msb) = buffer[0].view_bits::<Lsb0>().split_at(0);
         let lsb = buffer[1];
         match sign[0] {
@@ -128,3 +129,14 @@ impl Register {
 //    let meas = TemperatureMeasurement([0b0000_1100, 0b0101_0010]);
 
 //}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn test_positive_temperature_conversion() {
+        let data = [0b0000_1100u8, 0b0101_0010u8];
+        let (sign, msb) = data[0].view_bits::<Lsb0>().split_at(0);
+        let lsb = data[1];
+        let temperature = (msb.load::<u8>() * 16 + lsb / 16) as f32;
+        assert_eq!(temperature, 197.125);
+    }
+}
