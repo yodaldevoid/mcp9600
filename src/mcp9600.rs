@@ -1,5 +1,6 @@
 #![deny(unsafe_code)]
 
+use bitfield;
 use embedded_hal::blocking::i2c;
 
 #[derive(Debug)]
@@ -47,6 +48,7 @@ where
     /// Returns the device's ID
     pub fn read_device_id_register(&mut self) -> Result<u8, E> {
         self.read_register(Register::DeviceID)
+        // This should return 64 for MCP9600 and 65 for MCP9601
     }
 
     /// Writes into a register
@@ -62,13 +64,32 @@ where
         let mut data = [0];
         self.i2c
             .write_read(self.address as u8, &[register.address()], &mut data)?;
-        Ok(u8::from_le_bytes(data))
+        Ok(u8::from_le_bytes(data)) // from_le_bytes converts from little endian
     }
 }
 
 #[derive(Clone, Copy)]
 pub enum Register {
-    DeviceID = 0b0010_0000, // Should contain the device ID. 0b00100000
+    HotJunction = 0b0000_0000,
+    JunctionsTemperatureDelta = 0b0000_0001,
+    ColdJunction = 0b0000_0010,
+    RawADCData = 0b0000_0011,
+    Status = 0b0000_0100,
+    SensorConfiguration = 0b0000_0101,
+    DeviceConfiguration = 0b0000_0110,
+    Alert1Configuration = 0b0000_1000,
+    Alert2Configuration = 0b0000_1001,
+    Alert3Configuration = 0b0000_1010,
+    Alert4Configuration = 0b0000_1011,
+    Alert1Hysteresis = 0b0000_1100,
+    Alert2Hysteresis = 0b0000_1101,
+    Alert3Hysteresis = 0b0000_1110,
+    Alert4Hysteresis = 0b0000_1111,
+    Alert1Limit = 0b0001_0000,
+    Alert2Limit = 0b0001_0001,
+    Alert3Limit = 0b0001_0010,
+    Alert4Limit = 0b0001_0011,
+    DeviceID = 0b0010_0000, // Should contain the device ID
 }
 
 impl Register {
