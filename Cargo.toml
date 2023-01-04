@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 embedded-hal = "0.2.7"
 bitfield = "0.14.0"
+bitvec = "~1.0"

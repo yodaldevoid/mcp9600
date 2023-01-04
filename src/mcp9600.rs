@@ -1,6 +1,6 @@
 #![deny(unsafe_code)]
 
-use bitfield;
+use bitvec::prelude::*;
 use embedded_hal::blocking::i2c;
 
 #[derive(Debug)]
@@ -66,6 +66,24 @@ where
             .write_read(self.address as u8, &[register.address()], &mut data)?;
         Ok(u8::from_le_bytes(data)) // from_le_bytes converts from little endian
     }
+
+    pub fn read_hot_junction(&mut self) -> Result<f32, E> {
+        let mut data = [0u8, 2];
+        self.i2c.write_read(
+            self.address as u8,
+            &[Register::HotJunction as u8],
+            &mut data,
+        )?;
+    }
+
+    fn temperature_conversion(buffer: &[u8]) -> Result<f32, E> {
+        let (sign, msb) = buffer[0].view_bits::<Lsb0>().split_at(0);
+        let lsb = buffer[1];
+        match sign[0] {
+            false => return Ok((msb.load::<u8>() * 16 + lsb / 16).into()),
+            true => return Ok(<u8 as Into<f32>>::into(buffer[0] * 16 + lsb / 16) - 4096f32),
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -97,3 +115,16 @@ impl Register {
         *self as u8
     }
 }
+// This should be the temperature data structure
+//bitfield! {
+//    pub struct TemperatureMeasurement([u8]);
+//    u8;
+//    sign, _: 15;
+//    msb, _: 8, 14;
+//    lsb, _: 7, 0;
+//}
+
+//fn main() {
+//    let meas = TemperatureMeasurement([0b0000_1100, 0b0101_0010]);
+
+//}
