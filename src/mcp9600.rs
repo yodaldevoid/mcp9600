@@ -90,7 +90,7 @@ where
         thermocoupletype: ThermocoupleType,
         filtercoefficient: FilterCoefficient,
     ) -> Result<(), E> {
-        let configuration: u8 = thermocoupletype as u8 & filtercoefficient as u8;
+        let configuration: u8 = thermocoupletype as u8 | filtercoefficient as u8;
         // for TypeK and Medium filter, this should produce the following LSB0 byte:
         // 0  0  0  0  0  1  0  0
         // 7  6  5  4  3  2  1  0
@@ -100,7 +100,27 @@ where
             &[Register::HotJunction as u8, configuration],
         )
     }
-    // TODO: Device Configuration Register
+
+    pub fn set_device_configuration(
+        &mut self,
+        coldjunctionresolution: ColdJunctionResolution,
+        adcresolution: ADCResolution,
+        burstmodesamples: BurstModeSamples,
+        shutdownmode: ShutdownMode,
+    ) -> Result<(), E> {
+        // 7  | 6   5 |  4   3   2 |  1   0
+        // CJ |ADC Res|Burst Mode  | Shutdown
+        let configuration = coldjunctionresolution as u8
+            | adcresolution as u8
+            | burstmodesamples as u8
+            | shutdownmode as u8;
+        // Example configuration for High CJ, 16bit ADC, 2 samples, Shutdown mode
+        // 0 | 0 1 | 0 0 1 | 0 1 = 37 = 0x25
+        self.i2c.write(
+            self.address as u8,
+            &[Register::DeviceConfiguration as u8, configuration],
+        )
+    }
     // TODO: Read Delta Temperature Register
     // TODO: Read Cold Junction
 }
@@ -156,25 +176,30 @@ pub enum FilterCoefficient {
 }
 
 pub enum ADCResolution {
-    Bit18 = 0b00,
-    Bit16 = 0b01,
-    Bit14 = 0b10,
-    Bit12 = 0b11,
+    Bit18 = 0b0000_0000,
+    Bit16 = 0b0010_0000,
+    Bit14 = 0b0100_0000,
+    Bit12 = 0b0110_0000,
 }
 pub enum BurstModeSamples {
-    Sample1 = 0b000,
-    Sample2 = 0b001,
-    Sample4 = 0b010,
-    Sample8 = 0b011,
-    Sample16 = 0b100,
-    Sample32 = 0b101,
-    Sample64 = 0b110,
-    Sample128 = 0b111,
+    Sample1 = 0b0000_0000,
+    Sample2 = 0b0000_0100,
+    Sample4 = 0b0000_1000,
+    Sample8 = 0b0000_1100,
+    Sample16 = 0b0001_0000,
+    Sample32 = 0b0001_0100,
+    Sample64 = 0b0001_1000,
+    Sample128 = 0b0001_1100,
 }
 pub enum ShutdownMode {
-    NormalMode = 0b00,
-    ShutdownMode = 0b01,
-    BurstMode = 0b10,
+    NormalMode = 0b0000_0000,
+    ShutdownMode = 0b0000_0001,
+    BurstMode = 0b0000_0010,
+}
+
+pub enum ColdJunctionResolution {
+    High = 0b0000_0000, //0.0625C
+    Low = 0b1000_0000,  //0.25C
 }
 impl Register {
     fn address(&self) -> u8 {
@@ -206,3 +231,5 @@ pub fn new_temperature_conversion(buffer: &[u8]) -> f32 {
         true => (buffer[0] as f32 * 16.0 + buffer[1] as f32 / 16.0) - 4096.0,
     }
 }
+
+// TODO: Test the configuration and sensor configuration registers
