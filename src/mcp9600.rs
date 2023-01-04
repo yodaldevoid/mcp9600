@@ -78,11 +78,10 @@ where
     }
 
     pub fn temperature_conversion(buffer: &[u8]) -> Result<f32, E> {
-        let (sign, msb) = buffer[0].view_bits::<Lsb0>().split_at(0);
-        let lsb = buffer[1];
-        match sign[0] {
-            false => return Ok((msb.load::<u8>() * 16 + lsb / 16).into()),
-            true => return Ok(<u8 as Into<f32>>::into(buffer[0] * 16 + lsb / 16) - 4096f32),
+        let sign = buffer[0].view_bits::<Lsb0>()[0];
+        match sign {
+            false => return Ok(buffer[0] as f32 * 16.0 + buffer[1] as f32 / 16.0),
+            true => return Ok((buffer[0] as f32 * 16.0 + buffer[1] as f32 / 16.0) - 4096.0),
         }
     }
 }
@@ -116,27 +115,27 @@ impl Register {
         *self as u8
     }
 }
-// This should be the temperature data structure
-//bitfield! {
-//    pub struct TemperatureMeasurement([u8]);
-//    u8;
-//    sign, _: 15;
-//    msb, _: 8, 14;
-//    lsb, _: 7, 0;
-//}
-
-//fn main() {
-//    let meas = TemperatureMeasurement([0b0000_1100, 0b0101_0010]);
-
-//}
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
     fn test_positive_temperature_conversion() {
         let data = [0b0000_1100u8, 0b0101_0010u8];
-        let (sign, msb) = data[0].view_bits::<Lsb0>().split_at(0);
-        let lsb = data[1];
-        let temperature = (msb.load::<u8>() * 16 + lsb / 16) as f32;
+        let temperature = new_temperature_conversion(&data);
         assert_eq!(temperature, 197.125);
+    }
+    #[test]
+    fn test_negative_temperature_conversion() {
+        let data = [0b1111_0011u8, 0b1010_1101u8];
+        let temperature = new_temperature_conversion(&data);
+        assert_eq!(temperature, -197.1875);
+    }
+}
+
+pub fn new_temperature_conversion(buffer: &[u8]) -> f32 {
+    let sign = buffer[0].view_bits::<Lsb0>()[0];
+    match sign {
+        false => buffer[0] as f32 * 16.0 + buffer[1] as f32 / 16.0,
+        true => (buffer[0] as f32 * 16.0 + buffer[1] as f32 / 16.0) - 4096.0,
     }
 }
