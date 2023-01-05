@@ -1,12 +1,12 @@
 use bitvec::prelude::*;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub struct Temperature(f32);
+pub struct Temperature(pub f32);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RawTemperature {
-    msb: u8,
-    lsb: u8,
+    pub msb: u8,
+    pub lsb: u8,
 }
 
 impl From<RawTemperature> for Temperature {
