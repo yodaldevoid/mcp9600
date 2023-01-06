@@ -27,8 +27,11 @@ where
     }
 
     /// Returns the Device's ID
-    pub fn read_device_id_register(&mut self) -> Result<u8, E> {
-        self.read_register(Register::DeviceID)
+    pub fn read_device_id_register(&mut self) -> Result<[u8; 2], E> {
+        let mut data = [0u8, 0u8];
+        self.i2c
+            .write_read(self.address as u8, &[Register::DeviceID as u8], &mut data)?;
+        Ok(data)
         // This should return 64 for the MCP9600 and 65 for the MCP9601
     }
 
@@ -48,8 +51,10 @@ where
         Ok(u8::from_le_bytes(data)) // from_le_bytes converts from little endian
     }
 
+    /// Reads the `hot junction` or thermocouple side
+    /// ! This will still succeed even if there is no thermocouple connected !
     pub fn read_hot_junction(&mut self) -> Result<f32, E> {
-        let mut data = [0u8, 2];
+        let mut data = [0u8, 0u8];
         self.i2c.write_read(
             self.address as u8,
             &[Register::HotJunction as u8],
@@ -63,6 +68,34 @@ where
         Ok(temperature.0)
     }
 
+    /// Reads the `cold junction` or internal temperature of the
+    /// mcp960x chip
+    pub fn read_cold_junction(&mut self) -> Result<f32, E> {
+        let mut data = [0u8, 0u8];
+        self.i2c.write_read(
+            self.address as u8,
+            &[Register::ColdJunction as u8],
+            &mut data,
+        )?;
+        let data = RawTemperature {
+            msb: data[0],
+            lsb: data[1],
+        };
+        let temperature: Temperature = data.into();
+        Ok(temperature.0)
+    }
+
+    /// Reads the raw ADC data. Does no extra processing of the returned data
+    /// Note that the data is formatted LSB0
+    pub fn read_adc_raw(&mut self) -> Result<[u8; 3], E> {
+        let mut data = [0u8, 0u8, 0u8];
+        self.i2c
+            .write_read(self.address as u8, &[Register::RawADCData as u8], &mut data)?;
+        Ok(data)
+    }
+
+    /// Set the sensor configuration. Requires a thermocouple type, and filter coefficient to be
+    /// specified
     pub fn set_sensor_configuration(
         &mut self,
         thermocoupletype: ThermocoupleType,
@@ -75,6 +108,9 @@ where
         )
     }
 
+    /// Sets the device configuration. Requires a cold junction resolution
+    /// ADC resolution, burst mode samples (even if not using burst mode),
+    /// and shutdown mode.
     pub fn set_device_configuration(
         &mut self,
         coldjunctionresolution: ColdJunctionResolution,
@@ -176,9 +212,13 @@ pub enum FilterCoefficient {
 }
 
 pub enum ADCResolution {
+    /// 320 ms update time
     Bit18 = 0b0000_0000,
+    /// 80 ms update time
     Bit16 = 0b0010_0000,
+    /// 20 ms update time
     Bit14 = 0b0100_0000,
+    /// 5 ms update time
     Bit12 = 0b0110_0000,
 }
 pub enum BurstModeSamples {
