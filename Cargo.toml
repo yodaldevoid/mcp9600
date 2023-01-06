@@ -2,7 +2,10 @@
 name = "mcp9600"
 version = "0.1.0"
 edition = "2021"
-
+description = "Basic embedded-hal-based I2C driver for the MCP9600 and MCP9601 thermocouple amplifier ICs"
+repository = "https://github.com/besselfunct/mcp9600"
+license = "MIT"
+license-file = "LICENSE.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
