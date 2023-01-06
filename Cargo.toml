@@ -1,6 +1,6 @@
 [package]
 name = "mcp9600"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Basic embedded-hal-based I2C driver for the MCP9600 and MCP9601 thermocouple amplifier ICs"
 repository = "https://github.com/besselfunct/mcp9600"
