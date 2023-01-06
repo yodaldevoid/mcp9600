@@ -12,3 +12,4 @@ Currently, the following features are implemented:
 TODO:
 - Read the status register and pass the result to the user
 - Enable configuration of the Alert registers
+- Documentation
