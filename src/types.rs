@@ -31,6 +31,7 @@ fn convert_temperature(buffer: RawTemperature) -> f32 {
     }
 }
 
+// TODO: need to fix testing because of the weird behavior of the sign bit
 #[cfg(test)]
 mod tests {
     use super::*;
