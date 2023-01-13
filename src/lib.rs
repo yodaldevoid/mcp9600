@@ -68,6 +68,19 @@ where
         Ok(temperature.0)
     }
 
+    pub fn read_raw_hot_junction(&mut self) -> Result<RawTemperature, E> {
+        let mut data = [0u8; 2];
+        self.i2c.write_read(
+            self.address as u8,
+            &[Register::HotJunction as u8],
+            &mut data,
+        )?;
+        let data = RawTemperature {
+            msb: data[0],
+            lsb: data[1],
+        };
+        Ok(data)
+    }
     /// Reads the `cold junction` or internal temperature of the
     /// mcp960x chip
     pub fn read_cold_junction(&mut self) -> Result<f32, E> {
