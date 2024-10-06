@@ -3,8 +3,7 @@
 
 mod types;
 
-//use bitvec::prelude::*;
-use embedded_hal::blocking::i2c;
+use embedded_hal::i2c;
 
 pub use types::*;
 
@@ -17,17 +16,14 @@ pub struct MCP9600<I2C> {
     address: DeviceAddr,
 }
 
-impl<I2C, E> MCP9600<I2C>
-where
-    I2C: i2c::WriteRead<Error = E> + i2c::Write<Error = E>,
-{
+impl<I2C: i2c::I2c> MCP9600<I2C> {
     /// Creates a new instance of the sensor, taking ownership of the i2c peripheral
-    pub fn new(i2c: I2C, address: DeviceAddr) -> Result<Self, E> {
+    pub fn new(i2c: I2C, address: DeviceAddr) -> Result<Self, I2C::Error> {
         Ok(Self { i2c, address })
     }
 
     /// Returns the Device's ID
-    pub fn read_device_id_register(&mut self) -> Result<[u8; 2], E> {
+    pub fn read_device_id_register(&mut self) -> Result<[u8; 2], I2C::Error> {
         let mut data = [0u8, 0u8];
         self.i2c
             .write_read(self.address as u8, &[Register::DeviceID as u8], &mut data)?;
@@ -37,14 +33,14 @@ where
 
     /// Writes into a register
     #[allow(unused)]
-    fn write_register(&mut self, register: Register, value: u8) -> Result<(), E> {
+    fn write_register(&mut self, register: Register, value: u8) -> Result<(), I2C::Error> {
         let byte = value as u8;
         self.i2c
             .write(self.address as u8, &[register.address(), byte])
     }
 
     /// Reads a register using the `write_read` method
-    fn read_register(&mut self, register: Register) -> Result<u8, E> {
+    fn read_register(&mut self, register: Register) -> Result<u8, I2C::Error> {
         let mut data = [0];
         self.i2c
             .write_read(self.address as u8, &[register.address()], &mut data)?;
@@ -53,7 +49,7 @@ where
 
     /// Reads the `hot junction` or thermocouple side
     /// ! This will still succeed even if there is no thermocouple connected !
-    pub fn read_hot_junction(&mut self) -> Result<f32, E> {
+    pub fn read_hot_junction(&mut self) -> Result<f32, I2C::Error> {
         let mut data = [0u8, 0u8];
         self.i2c.write_read(
             self.address as u8,
@@ -68,7 +64,7 @@ where
         Ok(temperature.0)
     }
 
-    pub fn read_raw_hot_junction(&mut self) -> Result<RawTemperature, E> {
+    pub fn read_raw_hot_junction(&mut self) -> Result<RawTemperature, I2C::Error> {
         let mut data = [0u8; 2];
         self.i2c.write_read(
             self.address as u8,
@@ -83,7 +79,7 @@ where
     }
     /// Reads the `cold junction` or internal temperature of the
     /// mcp960x chip
-    pub fn read_cold_junction(&mut self) -> Result<f32, E> {
+    pub fn read_cold_junction(&mut self) -> Result<f32, I2C::Error> {
         let mut data = [0u8, 0u8];
         self.i2c.write_read(
             self.address as u8,
@@ -100,7 +96,7 @@ where
 
     /// Reads the raw ADC data. Does no extra processing of the returned data
     /// Note that the data is formatted LSB0
-    pub fn read_adc_raw(&mut self) -> Result<[u8; 3], E> {
+    pub fn read_adc_raw(&mut self) -> Result<[u8; 3], I2C::Error> {
         let mut data = [0u8, 0u8, 0u8];
         self.i2c
             .write_read(self.address as u8, &[Register::RawADCData as u8], &mut data)?;
@@ -113,7 +109,7 @@ where
         &mut self,
         thermocoupletype: ThermocoupleType,
         filtercoefficient: FilterCoefficient,
-    ) -> Result<(), E> {
+    ) -> Result<(), I2C::Error> {
         let configuration = sensor_configuration(thermocoupletype, filtercoefficient);
         self.i2c.write(
             self.address as u8,
@@ -130,7 +126,7 @@ where
         adcresolution: ADCResolution,
         burstmodesamples: BurstModeSamples,
         shutdownmode: ShutdownMode,
-    ) -> Result<(), E> {
+    ) -> Result<(), I2C::Error> {
         let configuration = device_configuration(
             coldjunctionresolution,
             adcresolution,
