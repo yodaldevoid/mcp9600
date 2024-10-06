@@ -56,12 +56,7 @@ impl<I2C: i2c::I2c> MCP9600<I2C> {
             &[Register::HotJunction as u8],
             &mut data,
         )?;
-        let data = RawTemperature {
-            msb: data[0],
-            lsb: data[1],
-        };
-        let temperature: Temperature = data.into();
-        Ok(temperature.0)
+        Ok(Temperature::from(RawTemperature(u16::from_be_bytes(data))).0)
     }
 
     pub fn read_raw_hot_junction(&mut self) -> Result<RawTemperature, I2C::Error> {
@@ -71,11 +66,7 @@ impl<I2C: i2c::I2c> MCP9600<I2C> {
             &[Register::HotJunction as u8],
             &mut data,
         )?;
-        let data = RawTemperature {
-            msb: data[0],
-            lsb: data[1],
-        };
-        Ok(data)
+        Ok(RawTemperature(u16::from_be_bytes(data)))
     }
     /// Reads the `cold junction` or internal temperature of the
     /// mcp960x chip
@@ -86,12 +77,7 @@ impl<I2C: i2c::I2c> MCP9600<I2C> {
             &[Register::ColdJunction as u8],
             &mut data,
         )?;
-        let data = RawTemperature {
-            msb: data[0],
-            lsb: data[1],
-        };
-        let temperature: Temperature = data.into();
-        Ok(temperature.0)
+        Ok(Temperature::from(RawTemperature(u16::from_be_bytes(data))).0)
     }
 
     /// Reads the raw ADC data. Does no extra processing of the returned data
