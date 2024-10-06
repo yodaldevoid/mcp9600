@@ -49,18 +49,8 @@ impl<I2C: i2c::I2c> MCP9600<I2C> {
 
     /// Reads the `hot junction` or thermocouple side
     /// ! This will still succeed even if there is no thermocouple connected !
-    pub fn read_hot_junction(&mut self) -> Result<f32, I2C::Error> {
+    pub fn read_hot_junction(&mut self) -> Result<RawTemperature, I2C::Error> {
         let mut data = [0u8, 0u8];
-        self.i2c.write_read(
-            self.address as u8,
-            &[Register::HotJunction as u8],
-            &mut data,
-        )?;
-        Ok(Temperature::from(RawTemperature(u16::from_be_bytes(data))).0)
-    }
-
-    pub fn read_raw_hot_junction(&mut self) -> Result<RawTemperature, I2C::Error> {
-        let mut data = [0u8; 2];
         self.i2c.write_read(
             self.address as u8,
             &[Register::HotJunction as u8],
@@ -68,16 +58,17 @@ impl<I2C: i2c::I2c> MCP9600<I2C> {
         )?;
         Ok(RawTemperature(u16::from_be_bytes(data)))
     }
+
     /// Reads the `cold junction` or internal temperature of the
     /// mcp960x chip
-    pub fn read_cold_junction(&mut self) -> Result<f32, I2C::Error> {
+    pub fn read_cold_junction(&mut self) -> Result<RawTemperature, I2C::Error> {
         let mut data = [0u8, 0u8];
         self.i2c.write_read(
             self.address as u8,
             &[Register::ColdJunction as u8],
             &mut data,
         )?;
-        Ok(Temperature::from(RawTemperature(u16::from_be_bytes(data))).0)
+        Ok(RawTemperature(u16::from_be_bytes(data)))
     }
 
     /// Reads the raw ADC data. Does no extra processing of the returned data
