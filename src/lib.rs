@@ -148,25 +148,21 @@ impl Register {
 
 // Functions for testing
 /// Generates a binary u8 word which contains the necessary sensor configuration
-pub fn sensor_configuration(
+fn sensor_configuration(
     thermocoupletype: ThermocoupleType,
     filtercoefficient: FilterCoefficient,
 ) -> u8 {
-    let configuration: u8 = thermocoupletype as u8 | filtercoefficient as u8;
-    return configuration;
+    thermocoupletype as u8 | filtercoefficient as u8
 }
+
 /// Generates a binary u8 word which contains the necessary device configuration
-pub fn device_configuration(
+fn device_configuration(
     coldjunctionresolution: ColdJunctionResolution,
     adcresolution: ADCResolution,
     burstmodesamples: BurstModeSamples,
     shutdownmode: ShutdownMode,
 ) -> u8 {
-    let configuration = coldjunctionresolution as u8
-        | adcresolution as u8
-        | burstmodesamples as u8
-        | shutdownmode as u8;
-    return configuration;
+    coldjunctionresolution as u8 | adcresolution as u8 | burstmodesamples as u8 | shutdownmode as u8
 }
 
 // Enums
