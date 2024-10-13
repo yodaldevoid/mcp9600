@@ -2,7 +2,9 @@
 #![no_std]
 
 use core::slice;
-use embedded_hal::i2c;
+use embedded_hal::i2c::I2c;
+#[cfg(feature = "async")]
+use embedded_hal_async::i2c::I2c as AsyncI2c;
 
 #[derive(Debug)]
 pub struct MCP9600<I2C> {
@@ -10,11 +12,13 @@ pub struct MCP9600<I2C> {
     address: DeviceAddress,
 }
 
-impl<I2C: i2c::I2c> MCP9600<I2C> {
+impl<I2C> MCP9600<I2C> {
     pub fn new(i2c: I2C, address: DeviceAddress) -> Self {
         Self { i2c, address }
     }
+}
 
+impl<I2C: I2c> MCP9600<I2C> {
     /// Returns the device's ID and revision.
     pub fn device_id(&mut self) -> Result<[u8; 2], I2C::Error> {
         let mut data = [0u8, 0u8];
@@ -302,6 +306,372 @@ impl<I2C: i2c::I2c> MCP9600<I2C> {
         let data = limit.0.to_be_bytes();
         self.i2c
             .write(self.address as u8, &[reg as u8, data[0], data[1]])
+    }
+}
+
+#[cfg(feature = "async")]
+impl<I2C: AsyncI2c> MCP9600<I2C> {
+    /// Returns the device's ID and revision.
+    pub async fn device_id_async(&mut self) -> Result<[u8; 2], I2C::Error> {
+        let mut data = [0u8, 0u8];
+        self.i2c
+            .write_read(self.address as u8, &[Register::DeviceID as u8], &mut data)
+            .await?;
+        Ok(data)
+    }
+
+    /// Reads the thermocouple temperature with cold-junction correction applied.
+    pub async fn read_temperature_async(&mut self) -> Result<RawTemperature, I2C::Error> {
+        self._read_temperature_async(Register::HotJunction).await
+    }
+
+    /// Reads the thermocouple temperature without cold-junction correction applied.
+    pub async fn read_temperature_uncorrected_async(
+        &mut self,
+    ) -> Result<RawTemperature, I2C::Error> {
+        self._read_temperature_async(Register::JunctionsTemperatureDelta)
+            .await
+    }
+
+    /// Reads the `cold junction` or internal temperature of the MCP960x chip.
+    pub async fn read_temperature_internal_async(&mut self) -> Result<RawTemperature, I2C::Error> {
+        self._read_temperature_async(Register::ColdJunction).await
+    }
+
+    async fn _read_temperature_async(
+        &mut self,
+        reg: Register,
+    ) -> Result<RawTemperature, I2C::Error> {
+        let mut data = [0u8, 0u8];
+        self.i2c
+            .write_read(self.address as u8, &[reg as u8], &mut data)
+            .await?;
+        Ok(RawTemperature(u16::from_be_bytes(data)))
+    }
+
+    pub async fn read_adc_async(&mut self) -> Result<i32, I2C::Error> {
+        let mut data = [0u8, 0u8, 0u8];
+        self.i2c
+            .write_read(self.address as u8, &[Register::RawADCData as u8], &mut data)
+            .await?;
+        let sign_extend = ((data[0] & 0x80 == 0) as u8).wrapping_sub(1);
+        let raw = [sign_extend, data[0], data[1], data[2]];
+        Ok(i32::from_be_bytes(raw))
+    }
+
+    pub async fn status_async(&mut self) -> Result<Status, I2C::Error> {
+        let mut data = 0;
+        self.i2c
+            .write_read(
+                self.address as u8,
+                &[Register::Status as u8],
+                slice::from_mut(&mut data),
+            )
+            .await?;
+        Ok(Status::from_register(data))
+    }
+
+    pub async fn clear_burst_complete_async(&mut self) -> Result<(), I2C::Error> {
+        self.clear_status_async(true, false).await
+    }
+
+    pub async fn clear_temperature_update_async(&mut self) -> Result<(), I2C::Error> {
+        self.clear_status_async(false, true).await
+    }
+
+    pub async fn clear_status_async(
+        &mut self,
+        burst_complete: bool,
+        temperature_update: bool,
+    ) -> Result<(), I2C::Error> {
+        let data = ((burst_complete as u8) << 7) | ((temperature_update as u8) << 6);
+        self.i2c
+            .write(self.address as u8, &[Register::Status as u8, data])
+            .await
+    }
+
+    pub async fn sensor_configuration_async(
+        &mut self,
+    ) -> Result<(ThermocoupleType, FilterCoefficient), I2C::Error> {
+        let mut data = 0;
+        self.i2c
+            .write_read(
+                self.address as u8,
+                &[Register::SensorConfiguration as u8],
+                slice::from_mut(&mut data),
+            )
+            .await?;
+
+        let thermocouple_type = ThermocoupleType::from_register(data);
+        let filter_coefficient = FilterCoefficient::from_register(data);
+        Ok((thermocouple_type, filter_coefficient))
+    }
+
+    pub async fn set_sensor_configuration_async(
+        &mut self,
+        thermocouple_type: ThermocoupleType,
+        filter_coefficient: FilterCoefficient,
+    ) -> Result<(), I2C::Error> {
+        let configuration = thermocouple_type.to_register() | filter_coefficient.to_register();
+        self.i2c
+            .write(
+                self.address as u8,
+                &[Register::SensorConfiguration as u8, configuration],
+            )
+            .await
+    }
+
+    pub async fn device_configuration_async(
+        &mut self,
+    ) -> Result<
+        (
+            ColdJunctionResolution,
+            AdcResolution,
+            BurstModeSamples,
+            ShutdownMode,
+        ),
+        I2C::Error,
+    > {
+        let mut data = 0;
+        self.i2c
+            .write_read(
+                self.address as u8,
+                &[Register::SensorConfiguration as u8],
+                slice::from_mut(&mut data),
+            )
+            .await?;
+
+        let cold_resolution = ColdJunctionResolution::from_register(data);
+        let adc_resolution = AdcResolution::from_register(data);
+        let burst_samples = BurstModeSamples::from_register(data);
+        let shutdown_mode = ShutdownMode::from_register(data);
+        Ok((
+            cold_resolution,
+            adc_resolution,
+            burst_samples,
+            shutdown_mode,
+        ))
+    }
+
+    pub async fn set_device_configuration_async(
+        &mut self,
+        cold_resolution: ColdJunctionResolution,
+        adc_resolution: AdcResolution,
+        burst_samples: BurstModeSamples,
+        shutdown_mode: ShutdownMode,
+    ) -> Result<(), I2C::Error> {
+        let configuration = cold_resolution.to_register()
+            | adc_resolution.to_register()
+            | burst_samples.to_register()
+            | shutdown_mode.to_register();
+        self.i2c
+            .write(
+                self.address as u8,
+                &[Register::DeviceConfiguration as u8, configuration],
+            )
+            .await
+    }
+
+    pub async fn alert1_configuration_async(&mut self) -> Result<AlertConfig, I2C::Error> {
+        self.alert_configuration_async(Register::Alert1Configuration)
+            .await
+    }
+
+    pub async fn alert2_configuration_async(&mut self) -> Result<AlertConfig, I2C::Error> {
+        self.alert_configuration_async(Register::Alert2Configuration)
+            .await
+    }
+
+    pub async fn alert3_configuration_async(&mut self) -> Result<AlertConfig, I2C::Error> {
+        self.alert_configuration_async(Register::Alert3Configuration)
+            .await
+    }
+
+    pub async fn alert4_configuration_async(&mut self) -> Result<AlertConfig, I2C::Error> {
+        self.alert_configuration_async(Register::Alert4Configuration)
+            .await
+    }
+
+    async fn alert_configuration_async(
+        &mut self,
+        reg: Register,
+    ) -> Result<AlertConfig, I2C::Error> {
+        let mut data = [0u8];
+        self.i2c
+            .write_read(self.address as u8, &[reg as u8], &mut data)
+            .await?;
+        Ok(AlertConfig::from_register(data[0]))
+    }
+
+    pub async fn set_alert1_configuration_async(
+        &mut self,
+        config: AlertConfig,
+        clear_interrupt: bool,
+    ) -> Result<(), I2C::Error> {
+        self.set_alert_configuration_async(Register::Alert1Configuration, config, clear_interrupt)
+            .await
+    }
+
+    pub async fn set_alert2_configuration_async(
+        &mut self,
+        config: AlertConfig,
+        clear_interrupt: bool,
+    ) -> Result<(), I2C::Error> {
+        self.set_alert_configuration_async(Register::Alert2Configuration, config, clear_interrupt)
+            .await
+    }
+
+    pub async fn set_alert3_configuration_async(
+        &mut self,
+        config: AlertConfig,
+        clear_interrupt: bool,
+    ) -> Result<(), I2C::Error> {
+        self.set_alert_configuration_async(Register::Alert3Configuration, config, clear_interrupt)
+            .await
+    }
+
+    pub async fn set_alert4_configuration_async(
+        &mut self,
+        config: AlertConfig,
+        clear_interrupt: bool,
+    ) -> Result<(), I2C::Error> {
+        self.set_alert_configuration_async(Register::Alert4Configuration, config, clear_interrupt)
+            .await
+    }
+
+    async fn set_alert_configuration_async(
+        &mut self,
+        reg: Register,
+        config: AlertConfig,
+        clear_interrupt: bool,
+    ) -> Result<(), I2C::Error> {
+        self.i2c
+            .write(
+                self.address as u8,
+                &[reg as u8, config.to_register(clear_interrupt)],
+            )
+            .await
+    }
+
+    pub async fn alert1_hysteresis_async(&mut self) -> Result<u8, I2C::Error> {
+        self.alert_hysteresis_async(Register::Alert1Configuration)
+            .await
+    }
+
+    pub async fn alert2_hysteresis_async(&mut self) -> Result<u8, I2C::Error> {
+        self.alert_hysteresis_async(Register::Alert2Configuration)
+            .await
+    }
+
+    pub async fn alert3_hysteresis_async(&mut self) -> Result<u8, I2C::Error> {
+        self.alert_hysteresis_async(Register::Alert3Configuration)
+            .await
+    }
+
+    pub async fn alert4_hysteresis_async(&mut self) -> Result<u8, I2C::Error> {
+        self.alert_hysteresis_async(Register::Alert4Configuration)
+            .await
+    }
+
+    async fn alert_hysteresis_async(&mut self, reg: Register) -> Result<u8, I2C::Error> {
+        let mut data = 0;
+        self.i2c
+            .write_read(self.address as u8, &[reg as u8], slice::from_mut(&mut data))
+            .await?;
+        Ok(data)
+    }
+
+    pub async fn set_alert1_hysteresis_async(&mut self, hysteresis: u8) -> Result<(), I2C::Error> {
+        self.set_alert_hysteresis_async(Register::Alert1Configuration, hysteresis)
+            .await
+    }
+
+    pub async fn set_alert2_hysteresis_async(&mut self, hysteresis: u8) -> Result<(), I2C::Error> {
+        self.set_alert_hysteresis_async(Register::Alert2Configuration, hysteresis)
+            .await
+    }
+
+    pub async fn set_alert3_hysteresis_async(&mut self, hysteresis: u8) -> Result<(), I2C::Error> {
+        self.set_alert_hysteresis_async(Register::Alert3Configuration, hysteresis)
+            .await
+    }
+
+    pub async fn set_alert4_hysteresis_async(&mut self, hysteresis: u8) -> Result<(), I2C::Error> {
+        self.set_alert_hysteresis_async(Register::Alert4Configuration, hysteresis)
+            .await
+    }
+
+    async fn set_alert_hysteresis_async(
+        &mut self,
+        reg: Register,
+        hysteresis: u8,
+    ) -> Result<(), I2C::Error> {
+        self.i2c
+            .write(self.address as u8, &[reg as u8, hysteresis])
+            .await
+    }
+
+    pub async fn alert1_limit_async(&mut self) -> Result<RawTemperature, I2C::Error> {
+        self._read_temperature_async(Register::Alert1Configuration)
+            .await
+    }
+
+    pub async fn alert2_limit_async(&mut self) -> Result<RawTemperature, I2C::Error> {
+        self._read_temperature_async(Register::Alert2Configuration)
+            .await
+    }
+
+    pub async fn alert3_limit_async(&mut self) -> Result<RawTemperature, I2C::Error> {
+        self._read_temperature_async(Register::Alert3Configuration)
+            .await
+    }
+
+    pub async fn alert4_limit_async(&mut self) -> Result<RawTemperature, I2C::Error> {
+        self._read_temperature_async(Register::Alert4Configuration)
+            .await
+    }
+
+    pub async fn set_alert1_limit_async(
+        &mut self,
+        limit: RawTemperature,
+    ) -> Result<(), I2C::Error> {
+        self.set_alert_limit_async(Register::Alert1Configuration, limit)
+            .await
+    }
+
+    pub async fn set_alert2_limit_async(
+        &mut self,
+        limit: RawTemperature,
+    ) -> Result<(), I2C::Error> {
+        self.set_alert_limit_async(Register::Alert2Configuration, limit)
+            .await
+    }
+
+    pub async fn set_alert3_limit_async(
+        &mut self,
+        limit: RawTemperature,
+    ) -> Result<(), I2C::Error> {
+        self.set_alert_limit_async(Register::Alert3Configuration, limit)
+            .await
+    }
+
+    pub async fn set_alert4_limit_async(
+        &mut self,
+        limit: RawTemperature,
+    ) -> Result<(), I2C::Error> {
+        self.set_alert_limit_async(Register::Alert4Configuration, limit)
+            .await
+    }
+
+    async fn set_alert_limit_async(
+        &mut self,
+        reg: Register,
+        limit: RawTemperature,
+    ) -> Result<(), I2C::Error> {
+        let data = limit.0.to_be_bytes();
+        self.i2c
+            .write(self.address as u8, &[reg as u8, data[0], data[1]])
+            .await
     }
 }
 
