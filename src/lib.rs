@@ -30,27 +30,25 @@ impl<I2C: i2c::I2c> MCP9600<I2C> {
         Ok(data)
     }
 
-    /// Reads the `hot junction` or thermocouple side
-    /// ! This will still succeed even if there is no thermocouple connected !
-    pub fn read_hot_junction(&mut self) -> Result<RawTemperature, I2C::Error> {
-        let mut data = [0u8, 0u8];
-        self.i2c.write_read(
-            self.address as u8,
-            &[Register::HotJunction as u8],
-            &mut data,
-        )?;
-        Ok(RawTemperature(u16::from_be_bytes(data)))
+    /// Reads the thermocouple temperature with cold-junction correction applied.
+    pub fn read_temperature(&mut self) -> Result<RawTemperature, I2C::Error> {
+        self._read_temperature(Register::HotJunction)
     }
 
-    /// Reads the `cold junction` or internal temperature of the
-    /// mcp960x chip
-    pub fn read_cold_junction(&mut self) -> Result<RawTemperature, I2C::Error> {
+    /// Reads the thermocouple temperature without cold-junction correction applied.
+    pub fn read_temperature_uncorrected(&mut self) -> Result<RawTemperature, I2C::Error> {
+        self._read_temperature(Register::JunctionsTemperatureDelta)
+    }
+
+    /// Reads the `cold junction` or internal temperature of the MCP960x chip.
+    pub fn read_temperature_internal(&mut self) -> Result<RawTemperature, I2C::Error> {
+        self._read_temperature(Register::ColdJunction)
+    }
+
+    fn _read_temperature(&mut self, reg: Register) -> Result<RawTemperature, I2C::Error> {
         let mut data = [0u8, 0u8];
-        self.i2c.write_read(
-            self.address as u8,
-            &[Register::ColdJunction as u8],
-            &mut data,
-        )?;
+        self.i2c
+            .write_read(self.address as u8, &[reg as u8], &mut data)?;
         Ok(RawTemperature(u16::from_be_bytes(data)))
     }
 
