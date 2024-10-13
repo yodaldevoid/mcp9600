@@ -343,6 +343,24 @@ pub enum DeviceAddress {
     AD7 = 0b110_0111,
 }
 
+impl TryFrom<u8> for DeviceAddress {
+    type Error = ();
+
+    fn try_from(value: u8) -> Result<DeviceAddress, ()> {
+        match value {
+            0b110_0000 => Ok(DeviceAddress::AD0),
+            0b110_0001 => Ok(DeviceAddress::AD1),
+            0b110_0010 => Ok(DeviceAddress::AD2),
+            0b110_0011 => Ok(DeviceAddress::AD3),
+            0b110_0100 => Ok(DeviceAddress::AD4),
+            0b110_0101 => Ok(DeviceAddress::AD5),
+            0b110_0110 => Ok(DeviceAddress::AD6),
+            0b110_0111 => Ok(DeviceAddress::AD7),
+            _ => Err(()),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
