@@ -54,6 +54,34 @@ impl<I2C: i2c::I2c> MCP9600<I2C> {
         Ok(i32::from_be_bytes(raw))
     }
 
+    pub fn status(&mut self) -> Result<Status, I2C::Error> {
+        let mut data = 0;
+        self.i2c.write_read(
+            self.address as u8,
+            &[Register::Status as u8],
+            slice::from_mut(&mut data),
+        )?;
+        Ok(Status::from_register(data))
+    }
+
+    pub fn clear_burst_complete(&mut self) -> Result<(), I2C::Error> {
+        self.clear_status(true, false)
+    }
+
+    pub fn clear_temperature_update(&mut self) -> Result<(), I2C::Error> {
+        self.clear_status(false, true)
+    }
+
+    pub fn clear_status(
+        &mut self,
+        burst_complete: bool,
+        temperature_update: bool,
+    ) -> Result<(), I2C::Error> {
+        let data = ((burst_complete as u8) << 7) | ((temperature_update as u8) << 6);
+        self.i2c
+            .write(self.address as u8, &[Register::Status as u8, data])
+    }
+
     pub fn sensor_configuration(
         &mut self,
     ) -> Result<(ThermocoupleType, FilterCoefficient), I2C::Error> {
@@ -163,6 +191,32 @@ pub struct RawTemperature(pub u16);
 impl From<RawTemperature> for Temperature {
     fn from(raw: RawTemperature) -> Self {
         Self((raw.0 as i16) as f32 / 16.0)
+    }
+}
+
+#[derive(Clone)]
+pub struct Status {
+    pub burst_complete: bool,
+    pub temperature_update: bool,
+    pub short_circuit: bool,
+    pub input_range_exceeded: bool,
+    pub alert: [bool; 4],
+}
+
+impl Status {
+    fn from_register(reg: u8) -> Self {
+        Self {
+            burst_complete: reg & 0x80 != 0,
+            temperature_update: reg & 0x40 != 0,
+            short_circuit: reg & 0x20 != 0,
+            input_range_exceeded: reg & 0x10 != 0,
+            alert: [
+                reg & 0x01 != 0,
+                reg & 0x02 != 0,
+                reg & 0x04 != 0,
+                reg & 0x08 != 0,
+            ],
+        }
     }
 }
 
