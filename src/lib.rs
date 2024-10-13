@@ -155,6 +155,154 @@ impl<I2C: i2c::I2c> MCP9600<I2C> {
             &[Register::DeviceConfiguration as u8, configuration],
         )
     }
+
+    pub fn alert1_configuration(&mut self) -> Result<AlertConfig, I2C::Error> {
+        self.alert_configuration(Register::Alert1Configuration)
+    }
+
+    pub fn alert2_configuration(&mut self) -> Result<AlertConfig, I2C::Error> {
+        self.alert_configuration(Register::Alert2Configuration)
+    }
+
+    pub fn alert3_configuration(&mut self) -> Result<AlertConfig, I2C::Error> {
+        self.alert_configuration(Register::Alert3Configuration)
+    }
+
+    pub fn alert4_configuration(&mut self) -> Result<AlertConfig, I2C::Error> {
+        self.alert_configuration(Register::Alert4Configuration)
+    }
+
+    fn alert_configuration(&mut self, reg: Register) -> Result<AlertConfig, I2C::Error> {
+        let mut data = 0;
+        self.i2c
+            .write_read(self.address as u8, &[reg as u8], slice::from_mut(&mut data))?;
+        Ok(AlertConfig::from_register(data))
+    }
+
+    pub fn set_alert1_configuration(
+        &mut self,
+        config: AlertConfig,
+        clear_interrupt: bool,
+    ) -> Result<(), I2C::Error> {
+        self.set_alert_configuration(Register::Alert1Configuration, config, clear_interrupt)
+    }
+
+    pub fn set_alert2_configuration(
+        &mut self,
+        config: AlertConfig,
+        clear_interrupt: bool,
+    ) -> Result<(), I2C::Error> {
+        self.set_alert_configuration(Register::Alert2Configuration, config, clear_interrupt)
+    }
+
+    pub fn set_alert3_configuration(
+        &mut self,
+        config: AlertConfig,
+        clear_interrupt: bool,
+    ) -> Result<(), I2C::Error> {
+        self.set_alert_configuration(Register::Alert3Configuration, config, clear_interrupt)
+    }
+
+    pub fn set_alert4_configuration(
+        &mut self,
+        config: AlertConfig,
+        clear_interrupt: bool,
+    ) -> Result<(), I2C::Error> {
+        self.set_alert_configuration(Register::Alert4Configuration, config, clear_interrupt)
+    }
+
+    fn set_alert_configuration(
+        &mut self,
+        reg: Register,
+        config: AlertConfig,
+        clear_interrupt: bool,
+    ) -> Result<(), I2C::Error> {
+        self.i2c.write(
+            self.address as u8,
+            &[reg as u8, config.to_register(clear_interrupt)],
+        )
+    }
+
+    pub fn alert1_hysteresis(&mut self) -> Result<u8, I2C::Error> {
+        self.alert_hysteresis(Register::Alert1Hysteresis)
+    }
+
+    pub fn alert2_hysteresis(&mut self) -> Result<u8, I2C::Error> {
+        self.alert_hysteresis(Register::Alert2Hysteresis)
+    }
+
+    pub fn alert3_hysteresis(&mut self) -> Result<u8, I2C::Error> {
+        self.alert_hysteresis(Register::Alert3Hysteresis)
+    }
+
+    pub fn alert4_hysteresis(&mut self) -> Result<u8, I2C::Error> {
+        self.alert_hysteresis(Register::Alert4Hysteresis)
+    }
+
+    fn alert_hysteresis(&mut self, reg: Register) -> Result<u8, I2C::Error> {
+        let mut data = 0;
+        self.i2c
+            .write_read(self.address as u8, &[reg as u8], slice::from_mut(&mut data))?;
+        Ok(data)
+    }
+
+    pub fn set_alert1_hysteresis(&mut self, hysteresis: u8) -> Result<(), I2C::Error> {
+        self.set_alert_hysteresis(Register::Alert1Hysteresis, hysteresis)
+    }
+
+    pub fn set_alert2_hysteresis(&mut self, hysteresis: u8) -> Result<(), I2C::Error> {
+        self.set_alert_hysteresis(Register::Alert2Hysteresis, hysteresis)
+    }
+
+    pub fn set_alert3_hysteresis(&mut self, hysteresis: u8) -> Result<(), I2C::Error> {
+        self.set_alert_hysteresis(Register::Alert3Hysteresis, hysteresis)
+    }
+
+    pub fn set_alert4_hysteresis(&mut self, hysteresis: u8) -> Result<(), I2C::Error> {
+        self.set_alert_hysteresis(Register::Alert4Hysteresis, hysteresis)
+    }
+
+    fn set_alert_hysteresis(&mut self, reg: Register, hysteresis: u8) -> Result<(), I2C::Error> {
+        self.i2c.write(self.address as u8, &[reg as u8, hysteresis])
+    }
+
+    pub fn alert1_limit(&mut self) -> Result<RawTemperature, I2C::Error> {
+        self._read_temperature(Register::Alert1Limit)
+    }
+
+    pub fn alert2_limit(&mut self) -> Result<RawTemperature, I2C::Error> {
+        self._read_temperature(Register::Alert2Limit)
+    }
+
+    pub fn alert3_limit(&mut self) -> Result<RawTemperature, I2C::Error> {
+        self._read_temperature(Register::Alert3Limit)
+    }
+
+    pub fn alert4_limit(&mut self) -> Result<RawTemperature, I2C::Error> {
+        self._read_temperature(Register::Alert4Limit)
+    }
+
+    pub fn set_alert1_limit(&mut self, limit: RawTemperature) -> Result<(), I2C::Error> {
+        self.set_alert_limit(Register::Alert1Limit, limit)
+    }
+
+    pub fn set_alert2_limit(&mut self, limit: RawTemperature) -> Result<(), I2C::Error> {
+        self.set_alert_limit(Register::Alert2Limit, limit)
+    }
+
+    pub fn set_alert3_limit(&mut self, limit: RawTemperature) -> Result<(), I2C::Error> {
+        self.set_alert_limit(Register::Alert3Limit, limit)
+    }
+
+    pub fn set_alert4_limit(&mut self, limit: RawTemperature) -> Result<(), I2C::Error> {
+        self.set_alert_limit(Register::Alert4Limit, limit)
+    }
+
+    fn set_alert_limit(&mut self, reg: Register, limit: RawTemperature) -> Result<(), I2C::Error> {
+        let data = limit.0.to_be_bytes();
+        self.i2c
+            .write(self.address as u8, &[reg as u8, data[0], data[1]])
+    }
 }
 
 #[allow(unused)]
@@ -191,6 +339,12 @@ pub struct RawTemperature(pub u16);
 impl From<RawTemperature> for Temperature {
     fn from(raw: RawTemperature) -> Self {
         Self((raw.0 as i16) as f32 / 16.0)
+    }
+}
+
+impl From<Temperature> for RawTemperature {
+    fn from(raw: Temperature) -> Self {
+        Self(((raw.0 * 16.0) as i16) as u16)
     }
 }
 
@@ -381,6 +535,70 @@ impl ShutdownMode {
             0b01 => ShutdownMode::ShutdownMode,
             0b10 => ShutdownMode::BurstMode,
             _ => ShutdownMode::NormalMode,
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum AlertMonitor {
+    HotJunction = 0,
+    ColdJunction = 1,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum AlertDirection {
+    Heating = 0,
+    Cooling = 1,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum AlertMode {
+    Comparator = 0,
+    Interrupt = 1,
+}
+
+#[derive(Clone)]
+pub struct AlertConfig {
+    pub monitor: AlertMonitor,
+    pub direction: AlertDirection,
+    pub active_high: bool,
+    pub mode: AlertMode,
+    pub enable: bool,
+}
+
+impl AlertConfig {
+    fn to_register(&self, clear_interrupt: bool) -> u8 {
+        ((clear_interrupt as u8) << 7)
+            | ((self.monitor as u8) << 4)
+            | ((self.direction as u8) << 3)
+            | ((self.active_high as u8) << 2)
+            | ((self.mode as u8) << 1)
+            | (self.enable as u8)
+    }
+
+    fn from_register(reg: u8) -> Self {
+        let monitor = if reg & 0x10 != 0 {
+            AlertMonitor::ColdJunction
+        } else {
+            AlertMonitor::HotJunction
+        };
+        let direction = if reg & 0x08 != 0 {
+            AlertDirection::Cooling
+        } else {
+            AlertDirection::Heating
+        };
+        let mode = if reg & 0x02 != 0 {
+            AlertMode::Interrupt
+        } else {
+            AlertMode::Comparator
+        };
+
+        Self {
+            monitor,
+            direction,
+            active_high: reg & 0x04 != 0,
+            mode,
+            enable: reg & 0x01 != 0,
         }
     }
 }
