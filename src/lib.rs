@@ -85,37 +85,52 @@ impl<I2C: i2c::I2c> MCP9600<I2C> {
         )
     }
 
-    /// Sets the device configuration. Requires a cold junction resolution
-    /// ADC resolution, burst mode samples (even if not using burst mode),
-    /// and shutdown mode.
+    pub fn device_configuration(
+        &mut self,
+    ) -> Result<
+        (
+            ColdJunctionResolution,
+            AdcResolution,
+            BurstModeSamples,
+            ShutdownMode,
+        ),
+        I2C::Error,
+    > {
+        let mut data = 0;
+        self.i2c.write_read(
+            self.address as u8,
+            &[Register::SensorConfiguration as u8],
+            slice::from_mut(&mut data),
+        )?;
+
+        let cold_resolution = ColdJunctionResolution::from_register(data);
+        let adc_resolution = AdcResolution::from_register(data);
+        let burst_samples = BurstModeSamples::from_register(data);
+        let shutdown_mode = ShutdownMode::from_register(data);
+        Ok((
+            cold_resolution,
+            adc_resolution,
+            burst_samples,
+            shutdown_mode,
+        ))
+    }
+
     pub fn set_device_configuration(
         &mut self,
-        coldjunctionresolution: ColdJunctionResolution,
-        adcresolution: ADCResolution,
-        burstmodesamples: BurstModeSamples,
-        shutdownmode: ShutdownMode,
+        cold_resolution: ColdJunctionResolution,
+        adc_resolution: AdcResolution,
+        burst_samples: BurstModeSamples,
+        shutdown_mode: ShutdownMode,
     ) -> Result<(), I2C::Error> {
-        let configuration = device_configuration(
-            coldjunctionresolution,
-            adcresolution,
-            burstmodesamples,
-            shutdownmode,
-        );
+        let configuration = cold_resolution.to_register()
+            | adc_resolution.to_register()
+            | burst_samples.to_register()
+            | shutdown_mode.to_register();
         self.i2c.write(
             self.address as u8,
             &[Register::DeviceConfiguration as u8, configuration],
         )
     }
-}
-
-/// Generates a binary u8 word which contains the necessary device configuration
-fn device_configuration(
-    coldjunctionresolution: ColdJunctionResolution,
-    adcresolution: ADCResolution,
-    burstmodesamples: BurstModeSamples,
-    shutdownmode: ShutdownMode,
-) -> u8 {
-    coldjunctionresolution as u8 | adcresolution as u8 | burstmodesamples as u8 | shutdownmode as u8
 }
 
 #[allow(unused)]
@@ -219,35 +234,105 @@ impl FilterCoefficient {
     }
 }
 
-pub enum ADCResolution {
-    /// 320 ms update time
-    Bit18 = 0b0000_0000,
-    /// 80 ms update time
-    Bit16 = 0b0010_0000,
-    /// 20 ms update time
-    Bit14 = 0b0100_0000,
-    /// 5 ms update time
-    Bit12 = 0b0110_0000,
-}
-pub enum BurstModeSamples {
-    Sample1 = 0b0000_0000,
-    Sample2 = 0b0000_0100,
-    Sample4 = 0b0000_1000,
-    Sample8 = 0b0000_1100,
-    Sample16 = 0b0001_0000,
-    Sample32 = 0b0001_0100,
-    Sample64 = 0b0001_1000,
-    Sample128 = 0b0001_1100,
-}
-pub enum ShutdownMode {
-    NormalMode = 0b0000_0000,
-    ShutdownMode = 0b0000_0001,
-    BurstMode = 0b0000_0010,
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum ColdJunctionResolution {
+    /// 0.0625 C per bit
+    High = 0,
+    /// 0.25 C per bit
+    Low = 1,
 }
 
-pub enum ColdJunctionResolution {
-    High = 0b0000_0000, //0.0625C
-    Low = 0b1000_0000,  //0.25C
+impl ColdJunctionResolution {
+    fn to_register(&self) -> u8 {
+        (*self as u8) << 7
+    }
+
+    fn from_register(reg: u8) -> Self {
+        if reg & 0x80 != 0 {
+            ColdJunctionResolution::Low
+        } else {
+            ColdJunctionResolution::High
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum AdcResolution {
+    /// 320 ms update time
+    Bit18 = 0b00,
+    /// 80 ms update time
+    Bit16 = 0b01,
+    /// 20 ms update time
+    Bit14 = 0b10,
+    /// 5 ms update time
+    Bit12 = 0b11,
+}
+
+impl AdcResolution {
+    fn to_register(&self) -> u8 {
+        (*self as u8) << 5
+    }
+
+    fn from_register(reg: u8) -> Self {
+        match (reg & 0x60) >> 5 {
+            0b01 => AdcResolution::Bit16,
+            0b10 => AdcResolution::Bit14,
+            0b11 => AdcResolution::Bit12,
+            _ => AdcResolution::Bit18,
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum BurstModeSamples {
+    Sample1 = 0b000,
+    Sample2 = 0b001,
+    Sample4 = 0b010,
+    Sample8 = 0b011,
+    Sample16 = 0b100,
+    Sample32 = 0b101,
+    Sample64 = 0b110,
+    Sample128 = 0b111,
+}
+
+impl BurstModeSamples {
+    fn to_register(&self) -> u8 {
+        (*self as u8) << 2
+    }
+
+    fn from_register(reg: u8) -> Self {
+        match (reg & 0x1C) >> 2 {
+            0b001 => BurstModeSamples::Sample2,
+            0b010 => BurstModeSamples::Sample4,
+            0b011 => BurstModeSamples::Sample8,
+            0b100 => BurstModeSamples::Sample16,
+            0b101 => BurstModeSamples::Sample32,
+            0b110 => BurstModeSamples::Sample64,
+            0b111 => BurstModeSamples::Sample128,
+            _ => BurstModeSamples::Sample1,
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum ShutdownMode {
+    NormalMode = 0b00,
+    ShutdownMode = 0b01,
+    BurstMode = 0b10,
+}
+
+impl ShutdownMode {
+    fn to_register(&self) -> u8 {
+        *self as u8
+    }
+
+    fn from_register(reg: u8) -> Self {
+        match reg & 0x6 {
+            0b01 => ShutdownMode::ShutdownMode,
+            0b10 => ShutdownMode::BurstMode,
+            _ => ShutdownMode::NormalMode,
+        }
+    }
 }
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum DeviceAddr {
@@ -307,14 +392,13 @@ mod tests {
             ThermocoupleType::J.to_register() | FilterCoefficient::Filter4.to_register();
         assert_eq!(config_byte, 0b0001_0100)
     }
+
     #[test]
     fn test_device_configuration() {
-        let config_byte = device_configuration(
-            ColdJunctionResolution::Low,
-            ADCResolution::Bit14,
-            BurstModeSamples::Sample16,
-            ShutdownMode::BurstMode,
-        );
+        let config_byte = ColdJunctionResolution::Low.to_register()
+            | AdcResolution::Bit14.to_register()
+            | BurstModeSamples::Sample16.to_register()
+            | ShutdownMode::BurstMode.to_register();
         assert_eq!(config_byte, 0b1101_0010)
     }
 }
