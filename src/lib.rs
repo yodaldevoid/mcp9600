@@ -22,13 +22,12 @@ impl<I2C: i2c::I2c> MCP9600<I2C> {
         Ok(Self { i2c, address })
     }
 
-    /// Returns the Device's ID
-    pub fn read_device_id_register(&mut self) -> Result<[u8; 2], I2C::Error> {
+    /// Returns the device's ID and revision.
+    pub fn device_id(&mut self) -> Result<[u8; 2], I2C::Error> {
         let mut data = [0u8, 0u8];
         self.i2c
             .write_read(self.address as u8, &[Register::DeviceID as u8], &mut data)?;
         Ok(data)
-        // This should return 64 for the MCP9600 and 65 for the MCP9601
     }
 
     /// Reads the `hot junction` or thermocouple side
