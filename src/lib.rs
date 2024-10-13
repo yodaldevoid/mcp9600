@@ -6,17 +6,13 @@ use embedded_hal::i2c;
 
 #[derive(Debug)]
 pub struct MCP9600<I2C> {
-    // The concrete I2C device implementation
     i2c: I2C,
-
-    // Device address
-    address: DeviceAddr,
+    address: DeviceAddress,
 }
 
 impl<I2C: i2c::I2c> MCP9600<I2C> {
-    /// Creates a new instance of the sensor, taking ownership of the i2c peripheral
-    pub fn new(i2c: I2C, address: DeviceAddr) -> Result<Self, I2C::Error> {
-        Ok(Self { i2c, address })
+    pub fn new(i2c: I2C, address: DeviceAddress) -> Self {
+        Self { i2c, address }
     }
 
     /// Returns the device's ID and revision.
@@ -334,30 +330,19 @@ impl ShutdownMode {
         }
     }
 }
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum DeviceAddr {
-    // The device address can be any of 8 values from 96-103 depending on the value of pin 16
-    // If tied to GND then the value should be 0b110_0000
-    // If tied to VDD then the value should be 0b110_0111
 
-    // 96
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DeviceAddress {
     AD0 = 0b110_0000,
-    // 97
     AD1 = 0b110_0001,
-    // 98
     AD2 = 0b110_0010,
-    // 99
     AD3 = 0b110_0011,
-    // 100
     AD4 = 0b110_0100,
-    // 101
     AD5 = 0b110_0101,
-    // 102
     AD6 = 0b110_0110,
-    // 103
     AD7 = 0b110_0111,
 }
-// Testing
+
 #[cfg(test)]
 mod tests {
     use super::*;
