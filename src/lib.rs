@@ -31,22 +31,6 @@ impl<I2C: i2c::I2c> MCP9600<I2C> {
         // This should return 64 for the MCP9600 and 65 for the MCP9601
     }
 
-    /// Writes into a register
-    #[allow(unused)]
-    fn write_register(&mut self, register: Register, value: u8) -> Result<(), I2C::Error> {
-        let byte = value as u8;
-        self.i2c
-            .write(self.address as u8, &[register.address(), byte])
-    }
-
-    /// Reads a register using the `write_read` method
-    fn read_register(&mut self, register: Register) -> Result<u8, I2C::Error> {
-        let mut data = [0];
-        self.i2c
-            .write_read(self.address as u8, &[register.address()], &mut data)?;
-        Ok(u8::from_le_bytes(data)) // from_le_bytes converts from little endian
-    }
-
     /// Reads the `hot junction` or thermocouple side
     /// ! This will still succeed even if there is no thermocouple connected !
     pub fn read_hot_junction(&mut self) -> Result<RawTemperature, I2C::Error> {
@@ -117,12 +101,6 @@ impl<I2C: i2c::I2c> MCP9600<I2C> {
     }
 }
 
-impl Register {
-    fn address(&self) -> u8 {
-        *self as u8
-    }
-}
-
 // Functions for testing
 /// Generates a binary u8 word which contains the necessary sensor configuration
 fn sensor_configuration(
@@ -142,9 +120,9 @@ fn device_configuration(
     coldjunctionresolution as u8 | adcresolution as u8 | burstmodesamples as u8 | shutdownmode as u8
 }
 
-// Enums
+#[allow(unused)]
 #[derive(Clone, Copy)]
-pub enum Register {
+enum Register {
     HotJunction = 0b0000_0000,
     JunctionsTemperatureDelta = 0b0000_0001,
     ColdJunction = 0b0000_0010,
