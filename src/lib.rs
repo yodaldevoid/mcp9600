@@ -151,7 +151,7 @@ enum Register {
     Alert2Limit = 0b0001_0001,
     Alert3Limit = 0b0001_0010,
     Alert4Limit = 0b0001_0011,
-    DeviceID = 0b0010_0000, // Should contain the device ID
+    DeviceID = 0b0010_0000,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
