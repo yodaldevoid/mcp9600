@@ -52,13 +52,13 @@ impl<I2C: i2c::I2c> MCP9600<I2C> {
         Ok(RawTemperature(u16::from_be_bytes(data)))
     }
 
-    /// Reads the raw ADC data. Does no extra processing of the returned data
-    /// Note that the data is formatted LSB0
-    pub fn read_adc_raw(&mut self) -> Result<[u8; 3], I2C::Error> {
+    pub fn read_adc(&mut self) -> Result<i32, I2C::Error> {
         let mut data = [0u8, 0u8, 0u8];
         self.i2c
             .write_read(self.address as u8, &[Register::RawADCData as u8], &mut data)?;
-        Ok(data)
+        let sign_extend = ((data[0] & 0x80 == 0) as u8).wrapping_sub(1);
+        let raw = [sign_extend, data[0], data[1], data[2]];
+        Ok(i32::from_be_bytes(raw))
     }
 
     /// Set the sensor configuration. Requires a thermocouple type, and filter coefficient to be
