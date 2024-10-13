@@ -1,6 +1,7 @@
 #![deny(unsafe_code)]
 #![no_std]
 
+use core::slice;
 use embedded_hal::i2c;
 
 #[derive(Debug)]
@@ -57,14 +58,27 @@ impl<I2C: i2c::I2c> MCP9600<I2C> {
         Ok(i32::from_be_bytes(raw))
     }
 
-    /// Set the sensor configuration. Requires a thermocouple type, and filter coefficient to be
-    /// specified
+    pub fn sensor_configuration(
+        &mut self,
+    ) -> Result<(ThermocoupleType, FilterCoefficient), I2C::Error> {
+        let mut data = 0;
+        self.i2c.write_read(
+            self.address as u8,
+            &[Register::SensorConfiguration as u8],
+            slice::from_mut(&mut data),
+        )?;
+
+        let thermocouple_type = ThermocoupleType::from_register(data);
+        let filter_coefficient = FilterCoefficient::from_register(data);
+        Ok((thermocouple_type, filter_coefficient))
+    }
+
     pub fn set_sensor_configuration(
         &mut self,
-        thermocoupletype: ThermocoupleType,
-        filtercoefficient: FilterCoefficient,
+        thermocouple_type: ThermocoupleType,
+        filter_coefficient: FilterCoefficient,
     ) -> Result<(), I2C::Error> {
-        let configuration = sensor_configuration(thermocoupletype, filtercoefficient);
+        let configuration = thermocouple_type.to_register() | filter_coefficient.to_register();
         self.i2c.write(
             self.address as u8,
             &[Register::SensorConfiguration as u8, configuration],
@@ -92,15 +106,6 @@ impl<I2C: i2c::I2c> MCP9600<I2C> {
             &[Register::DeviceConfiguration as u8, configuration],
         )
     }
-}
-
-// Functions for testing
-/// Generates a binary u8 word which contains the necessary sensor configuration
-fn sensor_configuration(
-    thermocoupletype: ThermocoupleType,
-    filtercoefficient: FilterCoefficient,
-) -> u8 {
-    thermocoupletype as u8 | filtercoefficient as u8
 }
 
 /// Generates a binary u8 word which contains the necessary device configuration
@@ -150,30 +155,68 @@ impl From<RawTemperature> for Temperature {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum ThermocoupleType {
-    // Rather than mess around with constructing a bit vector, lets just make this a logical
-    // operator
-    TypeK = 0b0000_0000,
-    TypeJ = 0b0001_0000,
-    TypeT = 0b0010_0000,
-    TypeN = 0b0011_0000,
-    TypeS = 0b0100_0000,
-    TypeE = 0b0101_0000,
-    TypeB = 0b0110_0000,
-    TypeR = 0b0111_0000,
+    K = 0b000,
+    J = 0b001,
+    T = 0b010,
+    N = 0b011,
+    S = 0b100,
+    E = 0b101,
+    B = 0b110,
+    R = 0b111,
 }
 
-#[derive(Clone, Copy)]
+impl ThermocoupleType {
+    fn to_register(&self) -> u8 {
+        (*self as u8) << 4
+    }
+
+    fn from_register(reg: u8) -> Self {
+        match (reg & 0x70) >> 4 {
+            0b001 => ThermocoupleType::J,
+            0b010 => ThermocoupleType::T,
+            0b011 => ThermocoupleType::N,
+            0b100 => ThermocoupleType::S,
+            0b101 => ThermocoupleType::E,
+            0b110 => ThermocoupleType::B,
+            0b111 => ThermocoupleType::R,
+            _ => ThermocoupleType::K,
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum FilterCoefficient {
-    FilterOff = 0b0000_0000,
-    FilterMinimum = 0b0000_0001,
-    Filter2 = 0b0000_0010,
-    Filter3 = 0b0000_0011,
-    FilterMedium = 0b0000_0100,
-    Filter5 = 0b0000_0101,
-    Filter6 = 0b0000_0110,
-    FilterMaximum = 0b0000_0111,
+    Off = 0b000,
+    /// Minimum
+    Filter1 = 0b001,
+    Filter2 = 0b010,
+    Filter3 = 0b011,
+    Filter4 = 0b100,
+    Filter5 = 0b101,
+    Filter6 = 0b110,
+    /// Maximum
+    Filter7 = 0b111,
+}
+
+impl FilterCoefficient {
+    fn to_register(&self) -> u8 {
+        *self as u8
+    }
+
+    fn from_register(reg: u8) -> Self {
+        match reg & 0x07 {
+            0b001 => FilterCoefficient::Filter1,
+            0b010 => FilterCoefficient::Filter2,
+            0b011 => FilterCoefficient::Filter3,
+            0b100 => FilterCoefficient::Filter4,
+            0b101 => FilterCoefficient::Filter5,
+            0b110 => FilterCoefficient::Filter6,
+            0b111 => FilterCoefficient::Filter7,
+            _ => FilterCoefficient::Off,
+        }
+    }
 }
 
 pub enum ADCResolution {
@@ -261,7 +304,7 @@ mod tests {
     #[test]
     fn test_sensor_configuration() {
         let config_byte =
-            sensor_configuration(ThermocoupleType::TypeJ, FilterCoefficient::FilterMedium);
+            ThermocoupleType::J.to_register() | FilterCoefficient::Filter4.to_register();
         assert_eq!(config_byte, 0b0001_0100)
     }
     #[test]
